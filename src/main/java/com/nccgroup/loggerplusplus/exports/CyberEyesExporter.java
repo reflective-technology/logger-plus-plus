@@ -14,7 +14,7 @@ import java.util.*;
 @Log4j2
 public abstract class CyberEyesExporter extends AutomaticLogExporter {
 
-    protected LogTableFilter logFilter;
+    protected volatile LogTableFilter logFilter;
 
     protected CyberEyesExporter(ExportController exportController, Preferences preferences) {
         super(exportController, preferences);
@@ -27,7 +27,7 @@ public abstract class CyberEyesExporter extends AutomaticLogExporter {
         cal.setTime(date);
         String month = new SimpleDateFormat("MMM", Locale.ENGLISH).format(date);
         int day = cal.get(Calendar.DAY_OF_MONTH);
-        String time = new SimpleDateFormat("HH:mm:ss").format(date);
+        String time = new SimpleDateFormat("HH:mm:ss", Locale.ENGLISH).format(date);
         return String.format("%s %2d %s", month, day, time);
     }
 
@@ -82,7 +82,8 @@ public abstract class CyberEyesExporter extends AutomaticLogExporter {
         fields.put("x_forwarded_for",        getRequestHeader(entry, "X-Forwarded-For"));
         fields.put("request_content_type",   str(entry.getValueByKey(LogEntryField.REQUEST_CONTENT_TYPE)));
         fields.put("request_content_length", getRequestHeader(entry, "Content-Length"));
-        fields.put("bytes_in",               entry.getRequestBytes().length);
+        byte[] reqBytes = entry.getRequestBytes();
+        fields.put("bytes_in",               reqBytes != null ? reqBytes.length : 0);
         fields.put("status",                 entry.getValueByKey(LogEntryField.STATUS));
         fields.put("response_content_type",  str(entry.getValueByKey(LogEntryField.RESPONSE_CONTENT_TYPE)));
         fields.put("response_content_length",getResponseHeader(entry, "Content-Length"));
@@ -97,7 +98,8 @@ public abstract class CyberEyesExporter extends AutomaticLogExporter {
         fields.put("cookie",                 str(entry.getValueByKey(LogEntryField.SENTCOOKIES)));
         fields.put("x_forwarded_host",       getRequestHeader(entry, "X-Forwarded-Host"));
         fields.put("x_powered_by",           getResponseHeader(entry, "X-Powered-By"));
-        fields.put("bytes_out",              entry.getResponseBytes().length);
+        byte[] respBytes = entry.getResponseBytes();
+        fields.put("bytes_out",              respBytes != null ? respBytes.length : 0);
         fields.put("duration",               entry.getValueByKey(LogEntryField.RTT));
         fields.put("body_bytes_out",         entry.getValueByKey(LogEntryField.RESPONSE_BODY_LENGTH));
         fields.put("body_bytes_in",          entry.getValueByKey(LogEntryField.REQUEST_BODY_LENGTH));
