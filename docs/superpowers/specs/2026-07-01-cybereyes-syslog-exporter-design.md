@@ -52,7 +52,7 @@ Extends `CyberEyesExporter`. Responsibilities:
   3. Reconnect fails → drop entry, increment dropped counter, increment consecutive-failure counter
   4. Consecutive-failure counter hits 5 → show dialog, call `shutdown()`
 - UDP: `DatagramSocket`, fire-and-forget; log and increment dropped counter on error
-- Tracks `sentCount` and `droppedCount` (atomic integers); notifies control panel after each update
+- Tracks `sentCount` (atomic integer, both protocols) and `droppedCount` (atomic integer, TCP only); notifies control panel after each update
 - No batching — syslog is a streaming protocol; entries are sent immediately
 
 ### `CyberEyesSyslogControlPanel`
@@ -60,12 +60,12 @@ Extends `CyberEyesExporter`. Responsibilities:
 Extends `JPanel`. Contains:
 - "Configure CyberEyes Exporter" button → opens `CyberEyesSyslogConfigDialog`
 - Toggle button: "Start / Stop CyberEyes Exporter" (uses `SwingWorker` to avoid blocking EDT)
-- Status area (updated live by the exporter):
+- Status area (updated live by the exporter, layout adapts to protocol):
   - Connection state indicator: green dot "Connected" / red dot "Disconnected" / grey "Idle"
-  - Entries sent counter: `Sent: 1,042`
-  - Entries dropped counter: `Dropped: 3`
+  - **TCP:** `Sent: 1,042` and `Dropped: 3` — dropped counts entries where reconnect also failed
+  - **UDP:** `Sent (best-effort): 1,042` — no dropped counter; UDP delivery is undetectable
   - Last sent timestamp: `Last sent: 2026-07-01 10:22:11`
-  - Last error message: `Error: Connection refused` (cleared on successful send)
+  - Last error message: `Error: Connection refused` (TCP only; cleared on successful send)
 
 ### `CyberEyesSyslogConfigDialog`
 
@@ -162,7 +162,7 @@ PREF_CYBEREYES_AUTOSTART_PROJECT    // Boolean, default false
 
 - **TCP connection failure on setup:** throw exception → ExportController shows dialog, exporter does not start
 - **TCP send failure during operation:** attempt one immediate reconnect; if reconnect also fails, drop entry, increment `droppedCount` and consecutive-failure counter; after 5 consecutive failures show dialog and call `shutdown()`; successful send resets consecutive-failure counter to 0
-- **UDP send failure:** log error, increment `droppedCount`, continue (fire-and-forget)
+- **UDP send failure:** UDP delivery is undetectable — no dropped counter. Local `IOException` from `send()` is logged only.
 - **Filter parse error:** log error, proceed without filter (consistent with ElasticExporter)
 - **Filter change warning:** same dialog as ElasticExporter — warn if current filter differs from last-used project filter
 - **Panel refresh:** control panel updates status labels via `SwingUtilities.invokeLater` after each send attempt (success or drop)
