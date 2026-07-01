@@ -53,7 +53,7 @@ public class CyberEyesSyslogExporter extends CyberEyesExporter implements Export
                 log.error("Could not automatically start CyberEyes exporter:", e);
             }
         }
-        // CyberEyesSyslogControlPanel wired in Task 5
+        controlPanel = new CyberEyesSyslogControlPanel(this);
     }
 
     @Override
