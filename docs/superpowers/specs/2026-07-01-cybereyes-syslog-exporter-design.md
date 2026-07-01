@@ -46,16 +46,26 @@ Subclasses implement `setup()`, `shutdown()`, and `sendEntry(String syslogMessag
 Extends `CyberEyesExporter`. Responsibilities:
 - Maintain a persistent TCP socket (or stateless UDP socket)
 - On `exportNewEntry` / `exportUpdatedEntry`: if entry is `Status.PROCESSED` and passes filter, build the RFC 3164 message and call `sendEntry()`
-- TCP: persistent `Socket`, reconnect on `IOException`, auto-shutdown after 5 consecutive failures (dialog shown, same pattern as `ElasticExporter`)
-- UDP: `DatagramSocket`, fire-and-forget per entry
+- TCP failure handling (per entry):
+  1. Send fails → attempt one immediate reconnect
+  2. Reconnect succeeds → reset consecutive-failure counter, resend entry
+  3. Reconnect fails → drop entry, increment dropped counter, increment consecutive-failure counter
+  4. Consecutive-failure counter hits 5 → show dialog, call `shutdown()`
+- UDP: `DatagramSocket`, fire-and-forget; log and increment dropped counter on error
+- Tracks `sentCount` and `droppedCount` (atomic integers); notifies control panel after each update
 - No batching — syslog is a streaming protocol; entries are sent immediately
 
 ### `CyberEyesSyslogControlPanel`
 
-Extends `JPanel`. Mirrors `ElasticExporterControlPanel`:
+Extends `JPanel`. Contains:
 - "Configure CyberEyes Exporter" button → opens `CyberEyesSyslogConfigDialog`
-- Toggle button: "Start / Stop CyberEyes Exporter"
-- Uses `SwingWorker` for enable/disable to avoid blocking the EDT
+- Toggle button: "Start / Stop CyberEyes Exporter" (uses `SwingWorker` to avoid blocking EDT)
+- Status area (updated live by the exporter):
+  - Connection state indicator: green dot "Connected" / red dot "Disconnected" / grey "Idle"
+  - Entries sent counter: `Sent: 1,042`
+  - Entries dropped counter: `Dropped: 3`
+  - Last sent timestamp: `Last sent: 2026-07-01 10:22:11`
+  - Last error message: `Error: Connection refused` (cleared on successful send)
 
 ### `CyberEyesSyslogConfigDialog`
 
@@ -151,10 +161,11 @@ PREF_CYBEREYES_AUTOSTART_PROJECT    // Boolean, default false
 ## Error Handling
 
 - **TCP connection failure on setup:** throw exception → ExportController shows dialog, exporter does not start
-- **TCP send failure during operation:** increment failure counter; after 5 consecutive failures show dialog and call `shutdown()`
-- **UDP send failure:** log the error, continue (fire-and-forget)
+- **TCP send failure during operation:** attempt one immediate reconnect; if reconnect also fails, drop entry, increment `droppedCount` and consecutive-failure counter; after 5 consecutive failures show dialog and call `shutdown()`; successful send resets consecutive-failure counter to 0
+- **UDP send failure:** log error, increment `droppedCount`, continue (fire-and-forget)
 - **Filter parse error:** log error, proceed without filter (consistent with ElasticExporter)
 - **Filter change warning:** same dialog as ElasticExporter — warn if current filter differs from last-used project filter
+- **Panel refresh:** control panel updates status labels via `SwingUtilities.invokeLater` after each send attempt (success or drop)
 
 ## Out of Scope
 
