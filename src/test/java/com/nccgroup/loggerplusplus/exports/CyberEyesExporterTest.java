@@ -114,4 +114,57 @@ class CyberEyesExporterTest {
         String header = EXPORTER.buildSyslogHeader("burp-host", new Date());
         assertTrue(header.endsWith(": "), "Must end with ': ' before message body");
     }
+
+    // ---- formatField: adversarial string values ----
+
+    @Test
+    void formatField_stringWithDoubleQuote_escaped() {
+        assertEquals("user_agent=\"Mozilla\\\"Gecko\\\"\"",
+            CyberEyesExporter.formatField("user_agent", "Mozilla\"Gecko\""));
+    }
+
+    @Test
+    void formatField_stringWithNewline_escaped() {
+        assertEquals("request_header=\"GET / HTTP/1.1\\r\\nHost: example.com\"",
+            CyberEyesExporter.formatField("request_header", "GET / HTTP/1.1\r\nHost: example.com"));
+    }
+
+    @Test
+    void formatField_stringWithBackslash_escaped() {
+        assertEquals("path=\"C:\\\\Users\\\\test\"",
+            CyberEyesExporter.formatField("path", "C:\\Users\\test"));
+    }
+
+    // ---- buildBodyFromMap: adversarial values flow through correctly ----
+
+    @Test
+    void buildBodyFromMap_valueWithSpecialChars_properlyEscaped() {
+        LinkedHashMap<String, Object> fields = new LinkedHashMap<>();
+        fields.put("request_header", "GET / HTTP/1.1\r\nHost: example.com\r\n");
+        fields.put("status", 200);
+        String result = CyberEyesExporter.buildBodyFromMap(fields);
+        assertEquals(
+            "request_header=\"GET / HTTP/1.1\\r\\nHost: example.com\\r\\n\" status=200",
+            result
+        );
+        // Critical invariant: no literal newlines in the output (would corrupt syslog framing)
+        assertFalse(result.contains("\n"), "Output must not contain literal newlines");
+        assertFalse(result.contains("\r"), "Output must not contain literal carriage returns");
+    }
+
+    // ---- buildSyslogHeader: full structure ----
+
+    @Test
+    void buildSyslogHeader_fullStructure() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(2026, Calendar.JULY, 1, 10, 22, 11);
+        String header = EXPORTER.buildSyslogHeader("test-host", cal.getTime());
+        // Must start with PRI, contain timestamp pattern, hostname, and tag
+        assertTrue(header.startsWith("<13>"), "Must start with PRI <13>");
+        assertTrue(header.contains("test-host"), "Must contain hostname");
+        assertTrue(header.contains(" pcap: "), "Must contain pcap tag with trailing space");
+        assertTrue(header.endsWith(": "), "Must end with ': '");
+        // Must not contain newlines
+        assertFalse(header.contains("\n"), "Header must not contain newlines");
+    }
 }

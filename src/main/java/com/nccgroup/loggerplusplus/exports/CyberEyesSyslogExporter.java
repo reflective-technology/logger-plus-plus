@@ -11,6 +11,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.io.*;
 import java.net.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -87,7 +89,8 @@ public class CyberEyesSyslogExporter extends CyberEyesExporter implements Export
     }
 
     private void connectTcp(String host, int port) throws IOException {
-        tcpSocket = new Socket(host, port);
+        SocketChannel channel = SocketChannel.open(new InetSocketAddress(host, port));
+        tcpSocket = channel.socket();
         tcpWriter = new PrintWriter(
                 new OutputStreamWriter(tcpSocket.getOutputStream(), StandardCharsets.UTF_8), true);
     }
@@ -147,23 +150,21 @@ public class CyberEyesSyslogExporter extends CyberEyesExporter implements Export
     }
 
     private void writeTcp(String message) throws IOException {
-        if (tcpSocket == null || tcpSocket.isClosed()) throw new IOException("Not connected");
-        // Pre-check: detect if the remote has sent FIN/RST before writing.
-        // PrintWriter swallows IOExceptions, so a blind write may appear to succeed
-        // even after the server has closed the connection. Reading with a short timeout
-        // forces the EOF/error to surface before we commit to sending.
-        int savedTimeout = tcpSocket.getSoTimeout();
-        tcpSocket.setSoTimeout(5); // 5 ms — enough for loopback; negligible for real networks
-        try {
-            int b = tcpSocket.getInputStream().read();
-            if (b == -1) throw new IOException("Connection closed by remote (EOF)");
-            // b >= 0 means the server unexpectedly sent data — discard and proceed
-        } catch (java.net.SocketTimeoutException ste) {
-            // Timeout: no EOF/RST pending — connection is alive
-        } finally {
-            tcpSocket.setSoTimeout(savedTimeout);
+        if (tcpWriter == null) throw new IOException("Not connected");
+        // Non-blocking EOF/RST pre-check — replaces the 5 ms SO_TIMEOUT read.
+        // A received FIN makes read() return -1 immediately (zero blocking time).
+        // A received RST makes read() throw IOException.  0 bytes = connection alive.
+        SocketChannel channel = (tcpSocket != null) ? tcpSocket.getChannel() : null;
+        if (channel != null) {
+            channel.configureBlocking(false);
+            try {
+                int n = channel.read(ByteBuffer.allocate(1));
+                if (n == -1) throw new IOException("Connection closed by remote (EOF)");
+                // n == 0: no pending data, connection alive; n > 0: unexpected server data, discard
+            } finally {
+                channel.configureBlocking(true);
+            }
         }
-        if (tcpWriter == null) throw new IOException("Writer not initialized");
         tcpWriter.println(message);
         if (tcpWriter.checkError()) throw new IOException("PrintWriter error after write");
     }

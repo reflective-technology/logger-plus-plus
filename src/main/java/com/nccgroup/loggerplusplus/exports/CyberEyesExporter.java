@@ -35,7 +35,13 @@ public abstract class CyberEyesExporter extends AutomaticLogExporter {
         if (value instanceof Number) {
             return key + "=" + value;
         }
-        return key + "=\"" + (value != null ? value.toString() : "") + "\"";
+        String s = value != null ? value.toString() : "";
+        // Escape backslash first, then quote, then control chars that corrupt framing
+        s = s.replace("\\", "\\\\")
+             .replace("\"", "\\\"")
+             .replace("\r", "\\r")
+             .replace("\n", "\\n");
+        return key + "=\"" + s + "\"";
     }
 
     static String buildBodyFromMap(LinkedHashMap<String, Object> fields) {
