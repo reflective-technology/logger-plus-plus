@@ -28,7 +28,7 @@ public abstract class CyberEyesExporter extends AutomaticLogExporter {
         String month = new SimpleDateFormat("MMM", Locale.ENGLISH).format(date);
         int day = cal.get(Calendar.DAY_OF_MONTH);
         String time = new SimpleDateFormat("HH:mm:ss", Locale.ENGLISH).format(date);
-        return String.format("%s %2d %s", month, day, time);
+        return String.format(Locale.ENGLISH, "%s %2d %s", month, day, time);
     }
 
     static String formatField(String key, Object value) {

@@ -134,12 +134,12 @@ public class CyberEyesSyslogControlPanel extends JPanel {
                 droppedLabel.setVisible(true);
                 droppedLabel.setText("Dropped: " + dropped);
             }
-            lastSentLabel.setText("Last sent: " +
-                    new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
             if (errorMessage != null) {
                 errorLabel.setText("Error: " + errorMessage);
                 applyConnectionState(ConnectionState.ERROR);
             } else {
+                lastSentLabel.setText("Last sent: " +
+                        new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
                 errorLabel.setText(" ");
                 applyConnectionState(ConnectionState.CONNECTED);
             }

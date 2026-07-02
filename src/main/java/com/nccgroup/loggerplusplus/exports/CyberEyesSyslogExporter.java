@@ -165,14 +165,18 @@ public class CyberEyesSyslogExporter extends CyberEyesExporter implements Export
                 channel.configureBlocking(true);
             }
         }
-        tcpWriter.println(message);
+        tcpWriter.print(message + "\n");
         if (tcpWriter.checkError()) throw new IOException("PrintWriter error after write");
     }
 
     // Package-private for testing
     void sendUdp(String message) {
+        if (udpSocket == null) {
+            log.error("CyberEyes UDP socket not initialized");
+            return;
+        }
         try {
-            byte[] data = (message + "\n").getBytes(StandardCharsets.UTF_8);
+            byte[] data = message.getBytes(StandardCharsets.UTF_8);
             InetAddress address = InetAddress.getByName(cachedHost);
             udpSocket.send(new DatagramPacket(data, data.length, address, cachedPort));
             notifyControlPanel(sentCount.incrementAndGet(), -1, null);

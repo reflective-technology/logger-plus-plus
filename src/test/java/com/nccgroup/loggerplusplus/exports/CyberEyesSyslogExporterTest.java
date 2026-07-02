@@ -26,9 +26,11 @@ class CyberEyesSyslogExporterTest {
     private ServerSocket server;
     private int port;
     private CyberEyesSyslogExporter exporter;
+    private ExecutorService executor;
 
     @BeforeEach
     void setUp() throws Exception {
+        executor = Executors.newSingleThreadExecutor();
         server = new ServerSocket(0);
         port = server.getLocalPort();
 
@@ -44,13 +46,14 @@ class CyberEyesSyslogExporterTest {
 
     @AfterEach
     void tearDown() throws Exception {
+        executor.shutdownNow();
         try { exporter.shutdown(); } catch (Exception ignored) {}
         try { server.close(); } catch (IOException ignored) {}
     }
 
     @Test
     void tcpSetup_connectsToServer() throws Exception {
-        Future<Socket> clientFuture = Executors.newSingleThreadExecutor().submit(server::accept);
+        Future<Socket> clientFuture = executor.submit(server::accept);
         exporter.setup();
         Socket client = clientFuture.get(2, TimeUnit.SECONDS);
         assertNotNull(client);
@@ -103,7 +106,7 @@ class CyberEyesSyslogExporterTest {
 
     @Test
     void tcpSend_reconnectFails_incrementsDroppedCount() throws Exception {
-        Future<Socket> firstClient = Executors.newSingleThreadExecutor().submit(server::accept);
+        Future<Socket> firstClient = executor.submit(server::accept);
         exporter.setup();
         Socket client = firstClient.get(2, TimeUnit.SECONDS);
         client.close();
@@ -118,7 +121,7 @@ class CyberEyesSyslogExporterTest {
 
     @Test
     void tcpSend_fiveConsecutiveFailures_callsShutdown() throws Exception {
-        Future<Socket> firstClient = Executors.newSingleThreadExecutor().submit(server::accept);
+        Future<Socket> firstClient = executor.submit(server::accept);
         exporter.setup();
         firstClient.get(2, TimeUnit.SECONDS).close();
         server.close();
@@ -135,7 +138,7 @@ class CyberEyesSyslogExporterTest {
 
     // Helper: accept one connection and read one line in background
     private Future<String> receiveLineAsync(ServerSocket ss) {
-        return Executors.newSingleThreadExecutor().submit(() -> {
+        return executor.submit(() -> {
             Socket client = ss.accept();
             String line = new BufferedReader(
                 new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8)).readLine();
