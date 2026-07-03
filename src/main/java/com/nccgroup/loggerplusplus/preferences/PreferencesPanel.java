@@ -223,6 +223,7 @@ public class PreferencesPanel extends JScrollPane {
         exportGroup.add(((ExportPanelProvider) exporters.get(JSONExporter.class)).getExportPanel());
         exportGroup.add(((ExportPanelProvider) exporters.get(HARExporter.class)).getExportPanel());
         exportGroup.add(((ExportPanelProvider) exporters.get(ElasticExporter.class)).getExportPanel());
+        exportGroup.add(((ExportPanelProvider) exporters.get(CyberEyesSyslogExporter.class)).getExportPanel());
 
         ComponentGroup otherPanel = new ComponentGroup(Orientation.VERTICAL, "Other");
         JSpinner spnRespTimeout = otherPanel.addPreferenceComponent(preferences, PREF_RESPONSE_TIMEOUT,
