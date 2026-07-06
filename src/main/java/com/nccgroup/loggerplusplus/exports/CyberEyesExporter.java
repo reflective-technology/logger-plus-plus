@@ -76,7 +76,8 @@ public abstract class CyberEyesExporter extends AutomaticLogExporter {
 
         LinkedHashMap<String, Object> fields = new LinkedHashMap<>();
         fields.put("time", requestTime != null ? isoFmt.format(requestTime) : "");
-        fields.put("src",                    str(entry.getValueByKey(LogEntryField.CLIENT_IP)));
+        String clientIp = str(entry.getValueByKey(LogEntryField.CLIENT_IP));
+        fields.put("src", clientIp.isEmpty() ? "127.0.0.1" : clientIp);
         fields.put("dest",                   str(entry.getValueByKey(LogEntryField.HOSTNAME)));
         fields.put("dest_port",              entry.getValueByKey(LogEntryField.PORT));
         fields.put("http_method",            str(entry.getValueByKey(LogEntryField.METHOD)));
