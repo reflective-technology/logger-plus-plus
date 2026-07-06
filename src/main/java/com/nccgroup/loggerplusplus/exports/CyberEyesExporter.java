@@ -11,6 +11,8 @@ import lombok.extern.log4j.Log4j2;
 
 import static com.nccgroup.loggerplusplus.util.Globals.PREF_CYBEREYES_BODY_LIMIT;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -78,7 +80,8 @@ public abstract class CyberEyesExporter extends AutomaticLogExporter {
         fields.put("time", requestTime != null ? isoFmt.format(requestTime) : "");
         String clientIp = str(entry.getValueByKey(LogEntryField.CLIENT_IP));
         fields.put("src", clientIp.isEmpty() ? "127.0.0.1" : clientIp);
-        fields.put("dest",                   str(entry.getValueByKey(LogEntryField.HOSTNAME)));
+        String destHost = str(entry.getValueByKey(LogEntryField.HOSTNAME));
+        fields.put("dest", resolveToIp(destHost));
         fields.put("dest_port",              entry.getValueByKey(LogEntryField.PORT));
         fields.put("http_method",            str(entry.getValueByKey(LogEntryField.METHOD)));
         fields.put("version",                httpVersionFromBytes(entry.getRequestBytes()));
@@ -149,6 +152,19 @@ public abstract class CyberEyesExporter extends AutomaticLogExporter {
     // capped value is always properly closed: field="...capped...".
     static String cap(String s, int maxLen) {
         return s.length() <= maxLen ? s : s.substring(0, maxLen);
+    }
+
+    // Resolve hostname to IP using the OS DNS cache (fast for recently-visited hosts).
+    // Falls back to "-" on failure so logstash skips the ipinfo-db lookup.
+    static String resolveToIp(String host) {
+        if (host == null || host.isEmpty()) return "-";
+        if (host.matches("^\\d{1,3}(\\.\\d{1,3}){3}$")) return host; // already IPv4
+        if (host.contains(":") && !host.startsWith("[")) return host;  // IPv6
+        try {
+            return InetAddress.getByName(host).getHostAddress();
+        } catch (UnknownHostException e) {
+            return "-";
+        }
     }
 
     protected void setFilter(String filterString) {
