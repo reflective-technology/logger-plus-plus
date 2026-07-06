@@ -81,12 +81,18 @@ public class CyberEyesSyslogConfigDialog extends JDialog {
         connectionGroup.addComponentWithLabel("Protocol: ", protocolPanel);
         connectionGroup.addComponentWithLabel("Syslog Hostname: ", syslogHostnameField);
 
+        JSpinner bodyLimitSpinner = PanelBuilder.createPreferenceSpinner(preferences, PREF_CYBEREYES_BODY_LIMIT);
+        ((SpinnerNumberModel) bodyLimitSpinner.getModel()).setMinimum(0);
+        ((SpinnerNumberModel) bodyLimitSpinner.getModel()).setMaximum(Integer.MAX_VALUE);
+        bodyLimitSpinner.setEditor(new JSpinner.NumberEditor(bodyLimitSpinner, "#"));
+
         ComponentGroup optionsGroup = new ComponentGroup(ComponentGroup.Orientation.VERTICAL, "Options");
         optionsGroup.add(PanelBuilder.build(new Component[][]{
                 new JComponent[]{new JLabel("Log Filter: "), filterField},
                 new JComponent[]{new JLabel("Autostart (All Projects): "), autostartGlobal},
                 new JComponent[]{new JLabel("Autostart (This Project): "), autostartProject},
-        }, new int[][]{{0,1},{0,1},{0,1}}, Alignment.FILL, 1, 1));
+                new JComponent[]{new JLabel("Body Limit (bytes, 0=unlimited): "), bodyLimitSpinner},
+        }, new int[][]{{0,1},{0,1},{0,1},{0,1}}, Alignment.FILL, 1, 1));
 
         PanelBuilder panelBuilder = new PanelBuilder();
         panelBuilder.setComponentGrid(new JComponent[][]{

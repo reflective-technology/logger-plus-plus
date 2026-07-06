@@ -81,6 +81,7 @@ public class Globals {
     public static final String PREF_CYBEREYES_FILTER_PROJECT_PREVIOUS = "cybereyesFilterProjectPrevious";
     public static final String PREF_CYBEREYES_AUTOSTART_GLOBAL = "cybereyesAutostartGlobal";
     public static final String PREF_CYBEREYES_AUTOSTART_PROJECT = "cybereyesAutostartProject";
+    public static final String PREF_CYBEREYES_BODY_LIMIT = "cybereyesBodyLimit";
     public static final String PREF_SAVED_FIELD_SELECTIONS = "savedFieldSelections";
     public static final String PREF_COLUMNS_VERSION = "columnsVersion";
     public static final String PREF_MAX_RESP_SIZE = "maxRespBodySize";

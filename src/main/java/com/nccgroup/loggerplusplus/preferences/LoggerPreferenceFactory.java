@@ -126,6 +126,7 @@ public class LoggerPreferenceFactory extends PreferenceFactory {
         prefs.registerSetting(PREF_CYBEREYES_FILTER_PROJECT_PREVIOUS, String.class, null, Preferences.Visibility.PROJECT);
         prefs.registerSetting(PREF_CYBEREYES_AUTOSTART_GLOBAL, Boolean.class, false);
         prefs.registerSetting(PREF_CYBEREYES_AUTOSTART_PROJECT, Boolean.class, false, Preferences.Visibility.PROJECT);
+        prefs.registerSetting(PREF_CYBEREYES_BODY_LIMIT, Integer.class, 1024);
 
         prefs.registerSetting(PREF_PREVIOUS_EXPORT_FIELDS, new TypeToken<List<LogEntryField>>() {
         }.getType(), new ArrayList<LogEntry>());

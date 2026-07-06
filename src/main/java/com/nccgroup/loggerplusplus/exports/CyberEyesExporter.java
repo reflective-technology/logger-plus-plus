@@ -6,8 +6,12 @@ import com.nccgroup.loggerplusplus.filter.logfilter.LogTableFilter;
 import com.nccgroup.loggerplusplus.filter.parser.ParseException;
 import com.nccgroup.loggerplusplus.logentry.LogEntry;
 import com.nccgroup.loggerplusplus.logentry.LogEntryField;
+import com.nccgroup.loggerplusplus.util.Globals;
 import lombok.extern.log4j.Log4j2;
 
+import static com.nccgroup.loggerplusplus.util.Globals.PREF_CYBEREYES_BODY_LIMIT;
+
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -76,7 +80,7 @@ public abstract class CyberEyesExporter extends AutomaticLogExporter {
         fields.put("dest",                   str(entry.getValueByKey(LogEntryField.HOSTNAME)));
         fields.put("dest_port",              entry.getValueByKey(LogEntryField.PORT));
         fields.put("http_method",            str(entry.getValueByKey(LogEntryField.METHOD)));
-        fields.put("version",                str(entry.getValueByKey(LogEntryField.REQUEST_HTTP_VERSION)));
+        fields.put("version",                httpVersionFromBytes(entry.getRequestBytes()));
         fields.put("uri_path",               str(entry.getValueByKey(LogEntryField.PATH)));
         fields.put("uri_query",              str(entry.getValueByKey(LogEntryField.QUERY)));
         fields.put("file_extension",         str(entry.getValueByKey(LogEntryField.EXTENSION)));
@@ -109,8 +113,41 @@ public abstract class CyberEyesExporter extends AutomaticLogExporter {
         fields.put("duration",               entry.getValueByKey(LogEntryField.RTT));
         fields.put("body_bytes_out",         entry.getValueByKey(LogEntryField.RESPONSE_BODY_LENGTH));
         fields.put("body_bytes_in",          entry.getValueByKey(LogEntryField.REQUEST_BODY_LENGTH));
+        int bodyLimit = (int) preferences.getSetting(PREF_CYBEREYES_BODY_LIMIT);
+        fields.put("request_body",           bodyLimit > 0 ? cap(bodyFromBytes(reqBytes), bodyLimit) : bodyFromBytes(reqBytes));
+        fields.put("response_body",          bodyLimit > 0 ? cap(bodyFromBytes(respBytes), bodyLimit) : bodyFromBytes(respBytes));
         fields.put("request_header",         str(entry.getValueByKey(LogEntryField.REQUEST_HEADERS)));
         return fields;
+    }
+
+    // Parse HTTP version from the raw request first line (e.g. "GET / HTTP/1.1\r\n...") → "1.1"
+    // Bypasses REQUEST_HTTP_VERSION which is broken in Burp 2026.6 (returns Host value instead).
+    static String httpVersionFromBytes(byte[] requestBytes) {
+        if (requestBytes == null || requestBytes.length == 0) return "";
+        int end = 0;
+        while (end < requestBytes.length && requestBytes[end] != '\r' && requestBytes[end] != '\n') end++;
+        String requestLine = new String(requestBytes, 0, end, StandardCharsets.UTF_8);
+        String[] tokens = requestLine.split(" ");
+        if (tokens.length < 3) return "";
+        String ver = tokens[tokens.length - 1];
+        return ver.startsWith("HTTP/") ? ver.substring(5) : ver;
+    }
+
+    // Extract body bytes after the \r\n\r\n header separator.
+    static String bodyFromBytes(byte[] rawBytes) {
+        if (rawBytes == null || rawBytes.length == 0) return "";
+        for (int i = 0; i < rawBytes.length - 3; i++) {
+            if (rawBytes[i] == '\r' && rawBytes[i+1] == '\n' && rawBytes[i+2] == '\r' && rawBytes[i+3] == '\n') {
+                return new String(rawBytes, i + 4, rawBytes.length - i - 4, StandardCharsets.UTF_8);
+            }
+        }
+        return "";
+    }
+
+    // Cap a string at maxLen chars. formatField adds quotes around the result, so the
+    // capped value is always properly closed: field="...capped...".
+    static String cap(String s, int maxLen) {
+        return s.length() <= maxLen ? s : s.substring(0, maxLen);
     }
 
     protected void setFilter(String filterString) {
