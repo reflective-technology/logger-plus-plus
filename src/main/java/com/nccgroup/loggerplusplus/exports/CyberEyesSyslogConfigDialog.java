@@ -9,8 +9,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
+import java.awt.event.*;
 import java.util.Objects;
 
 import static com.nccgroup.loggerplusplus.util.Globals.*;
@@ -45,8 +44,14 @@ public class CyberEyesSyslogConfigDialog extends JDialog {
         protocolPanel.add(tcpButton);
         protocolPanel.add(udpButton);
 
-        JTextField syslogHostnameField = PanelBuilder.createPreferenceTextField(
-            preferences, PREF_CYBEREYES_SYSLOG_HOSTNAME);
+        JTextField syslogHostnameField = new JTextField(
+            (String) preferences.getSetting(PREF_CYBEREYES_SYSLOG_HOSTNAME));
+        Runnable commitHostname = () ->
+            preferences.setSetting(PREF_CYBEREYES_SYSLOG_HOSTNAME, syslogHostnameField.getText());
+        syslogHostnameField.addFocusListener(new FocusAdapter() {
+            @Override public void focusLost(FocusEvent e) { commitHostname.run(); }
+        });
+        syslogHostnameField.addActionListener(e -> commitHostname.run()); // Enter key
 
         // Offer to restore previous filter if it changed
         String prevFilter = preferences.getSetting(PREF_CYBEREYES_FILTER_PROJECT_PREVIOUS);
