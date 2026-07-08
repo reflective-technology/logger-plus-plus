@@ -22,7 +22,17 @@ public class CyberEyesSyslogConfigDialog extends JDialog {
 
         Preferences preferences = exporter.getPreferences();
 
-        JTextField addressField = PanelBuilder.createPreferenceTextField(preferences, PREF_CYBEREYES_ADDRESS);
+        JTextField addressField = new JTextField(
+            (String) preferences.getSetting(PREF_CYBEREYES_ADDRESS));
+        Runnable commitAddress = () ->
+            preferences.setSetting(PREF_CYBEREYES_ADDRESS, addressField.getText());
+        addressField.addFocusListener(new FocusAdapter() {
+            @Override public void focusGained(FocusEvent e) {
+                SwingUtilities.invokeLater(addressField::selectAll);
+            }
+            @Override public void focusLost(FocusEvent e) { commitAddress.run(); }
+        });
+        addressField.addActionListener(e -> commitAddress.run());
 
         JSpinner portSpinner = PanelBuilder.createPreferenceSpinner(preferences, PREF_CYBEREYES_PORT);
         ((SpinnerNumberModel) portSpinner.getModel()).setMinimum(1);

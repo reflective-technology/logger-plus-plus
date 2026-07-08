@@ -78,6 +78,8 @@ public class CyberEyesSyslogExporter extends CyberEyesExporter implements Export
         consecutiveFailures = 0;
 
         cachedHost = preferences.getSetting(PREF_CYBEREYES_ADDRESS);
+        if (cachedHost == null || cachedHost.isBlank())
+            throw new Exception("Address is not configured.");
         cachedPort = (int) preferences.getSetting(PREF_CYBEREYES_PORT);
         Globals.CyberEyesProtocol protocol = preferences.getSetting(PREF_CYBEREYES_PROTOCOL);
 
@@ -89,7 +91,10 @@ public class CyberEyesSyslogExporter extends CyberEyesExporter implements Export
     }
 
     private void connectTcp(String host, int port) throws IOException {
-        SocketChannel channel = SocketChannel.open(new InetSocketAddress(host, port));
+        InetSocketAddress addr = new InetSocketAddress(host, port);
+        if (addr.isUnresolved())
+            throw new IOException("Cannot resolve address: " + host);
+        SocketChannel channel = SocketChannel.open(addr);
         tcpSocket = channel.socket();
         tcpWriter = new PrintWriter(
                 new OutputStreamWriter(tcpSocket.getOutputStream(), StandardCharsets.UTF_8), true);
