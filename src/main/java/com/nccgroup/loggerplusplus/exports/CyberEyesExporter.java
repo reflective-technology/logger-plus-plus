@@ -1,0 +1,208 @@
+package com.nccgroup.loggerplusplus.exports;
+
+import burp.api.montoya.http.message.HttpHeader;
+import com.coreyd97.BurpExtenderUtilities.Preferences;
+import com.nccgroup.loggerplusplus.filter.logfilter.LogTableFilter;
+import com.nccgroup.loggerplusplus.filter.parser.ParseException;
+import com.nccgroup.loggerplusplus.logentry.LogEntry;
+import com.nccgroup.loggerplusplus.logentry.LogEntryField;
+import com.nccgroup.loggerplusplus.util.Globals;
+import lombok.extern.log4j.Log4j2;
+
+import static com.nccgroup.loggerplusplus.util.Globals.PREF_CYBEREYES_BODY_LIMIT;
+
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+@Log4j2
+public abstract class CyberEyesExporter extends AutomaticLogExporter {
+
+    protected volatile LogTableFilter logFilter;
+
+    protected CyberEyesExporter(ExportController exportController, Preferences preferences) {
+        super(exportController, preferences);
+    }
+
+    // --- Package-private static methods: testable without Burp ---
+
+    static String formatSyslogTimestamp(Date date) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        String month = new SimpleDateFormat("MMM", Locale.ENGLISH).format(date);
+        int day = cal.get(Calendar.DAY_OF_MONTH);
+        String time = new SimpleDateFormat("HH:mm:ss", Locale.ENGLISH).format(date);
+        return String.format(Locale.ENGLISH, "%s %2d %s", month, day, time);
+    }
+
+    static String formatField(String key, Object value) {
+        if (value instanceof Number) {
+            return key + "=" + value;
+        }
+        String s = value != null ? value.toString() : "";
+        // Escape backslash first, then quote, then control chars that corrupt framing
+        s = s.replace("\\", "\\\\")
+             .replace("\"", "\\\"")
+             .replace("\r", "\\r")
+             .replace("\n", "\\n");
+        return key + "=\"" + s + "\"";
+    }
+
+    static String buildBodyFromMap(LinkedHashMap<String, Object> fields) {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, Object> entry : fields.entrySet()) {
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(formatField(entry.getKey(), entry.getValue()));
+        }
+        return sb.toString();
+    }
+
+    // --- Protected instance methods ---
+
+    protected String buildSyslogHeader(String hostname, Date date) {
+        return "<13>" + formatSyslogTimestamp(date) + " " + hostname + " pcap: ";
+    }
+
+    protected String buildSyslogMessage(String syslogHostname, LogEntry entry) {
+        Date requestTime = entry.getRequestDateTime();
+        if (requestTime == null) requestTime = new Date();
+        return buildSyslogHeader(syslogHostname, requestTime) + buildBodyFromMap(buildPcapFields(entry));
+    }
+
+    protected LinkedHashMap<String, Object> buildPcapFields(LogEntry entry) {
+        SimpleDateFormat isoFmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+        isoFmt.setTimeZone(TimeZone.getTimeZone("UTC"));
+        Date requestTime = entry.getRequestDateTime();
+
+        LinkedHashMap<String, Object> fields = new LinkedHashMap<>();
+        fields.put("time", requestTime != null ? isoFmt.format(requestTime) : "");
+        String clientIp = str(entry.getValueByKey(LogEntryField.CLIENT_IP));
+        fields.put("src", clientIp.isEmpty() ? "127.0.0.1" : clientIp);
+        String destHost = str(entry.getValueByKey(LogEntryField.HOSTNAME));
+        fields.put("dest", resolveToIp(destHost));
+        fields.put("dest_port",              entry.getValueByKey(LogEntryField.PORT));
+        fields.put("http_method",            str(entry.getValueByKey(LogEntryField.METHOD)));
+        fields.put("version",                httpVersionFromBytes(entry.getRequestBytes()));
+        fields.put("uri_path",               str(entry.getValueByKey(LogEntryField.PATH)));
+        fields.put("uri_query",              str(entry.getValueByKey(LogEntryField.QUERY)));
+        fields.put("file_extension",         str(entry.getValueByKey(LogEntryField.EXTENSION)));
+        fields.put("url_domain",             str(entry.getValueByKey(LogEntryField.HOSTNAME)));
+        fields.put("request_connection",     getRequestHeader(entry, "Connection"));
+        fields.put("http_user_agent",        getRequestHeader(entry, "User-Agent"));
+        fields.put("http_accept",            getRequestHeader(entry, "Accept"));
+        fields.put("http_referrer",          str(entry.getValueByKey(LogEntryField.REFERRER)));
+        fields.put("x_forwarded_for",        getRequestHeader(entry, "X-Forwarded-For"));
+        fields.put("request_content_type",   str(entry.getValueByKey(LogEntryField.REQUEST_CONTENT_TYPE)));
+        fields.put("request_content_length", getRequestHeader(entry, "Content-Length"));
+        byte[] reqBytes = entry.getRequestBytes();
+        fields.put("bytes_in",               reqBytes != null ? reqBytes.length : 0);
+        fields.put("status",                 entry.getValueByKey(LogEntryField.STATUS));
+        fields.put("response_content_type",  str(entry.getValueByKey(LogEntryField.RESPONSE_CONTENT_TYPE)));
+        fields.put("response_content_length",getResponseHeader(entry, "Content-Length"));
+        fields.put("authorization",          getRequestHeader(entry, "Authorization"));
+        fields.put("host",                   str(entry.getValueByKey(LogEntryField.HOSTNAME)));
+        fields.put("etag",                   getResponseHeader(entry, "ETag"));
+        fields.put("last_modified",          getResponseHeader(entry, "Last-Modified"));
+        fields.put("server",                 getResponseHeader(entry, "Server"));
+        fields.put("http_accept_language",   getRequestHeader(entry, "Accept-Language"));
+        fields.put("location",               getResponseHeader(entry, "Location"));
+        fields.put("set_cookie",             getResponseHeader(entry, "Set-Cookie"));
+        fields.put("cookie",                 str(entry.getValueByKey(LogEntryField.SENTCOOKIES)));
+        fields.put("x_forwarded_host",       getRequestHeader(entry, "X-Forwarded-Host"));
+        fields.put("x_powered_by",           getResponseHeader(entry, "X-Powered-By"));
+        byte[] respBytes = entry.getResponseBytes();
+        fields.put("bytes_out",              respBytes != null ? respBytes.length : 0);
+        fields.put("duration",               entry.getValueByKey(LogEntryField.RTT));
+        fields.put("body_bytes_out",         entry.getValueByKey(LogEntryField.RESPONSE_BODY_LENGTH));
+        fields.put("body_bytes_in",          entry.getValueByKey(LogEntryField.REQUEST_BODY_LENGTH));
+        int bodyLimit = (int) preferences.getSetting(PREF_CYBEREYES_BODY_LIMIT);
+        fields.put("request_body",           bodyLimit > 0 ? cap(bodyFromBytes(reqBytes), bodyLimit) : bodyFromBytes(reqBytes));
+        fields.put("response_body",          bodyLimit > 0 ? cap(bodyFromBytes(respBytes), bodyLimit) : bodyFromBytes(respBytes));
+        fields.put("request_header",         str(entry.getValueByKey(LogEntryField.REQUEST_HEADERS)));
+        return fields;
+    }
+
+    // Parse HTTP version from the raw request first line (e.g. "GET / HTTP/1.1\r\n...") → "1.1"
+    // Bypasses REQUEST_HTTP_VERSION which is broken in Burp 2026.6 (returns Host value instead).
+    static String httpVersionFromBytes(byte[] requestBytes) {
+        if (requestBytes == null || requestBytes.length == 0) return "";
+        int end = 0;
+        while (end < requestBytes.length && requestBytes[end] != '\r' && requestBytes[end] != '\n') end++;
+        String requestLine = new String(requestBytes, 0, end, StandardCharsets.UTF_8);
+        String[] tokens = requestLine.split(" ");
+        if (tokens.length < 3) return "";
+        String ver = tokens[tokens.length - 1];
+        return ver.startsWith("HTTP/") ? ver.substring(5) : ver;
+    }
+
+    // Extract body bytes after the \r\n\r\n header separator.
+    static String bodyFromBytes(byte[] rawBytes) {
+        if (rawBytes == null || rawBytes.length == 0) return "";
+        for (int i = 0; i < rawBytes.length - 3; i++) {
+            if (rawBytes[i] == '\r' && rawBytes[i+1] == '\n' && rawBytes[i+2] == '\r' && rawBytes[i+3] == '\n') {
+                return new String(rawBytes, i + 4, rawBytes.length - i - 4, StandardCharsets.UTF_8);
+            }
+        }
+        return "";
+    }
+
+    // Cap a string at maxLen chars. formatField adds quotes around the result, so the
+    // capped value is always properly closed: field="...capped...".
+    static String cap(String s, int maxLen) {
+        return s.length() <= maxLen ? s : s.substring(0, maxLen);
+    }
+
+    // Resolve hostname to IP using the OS DNS cache (fast for recently-visited hosts).
+    // Falls back to "-" on failure so logstash skips the ipinfo-db lookup.
+    static String resolveToIp(String host) {
+        if (host == null || host.isEmpty()) return "-";
+        if (host.matches("^\\d{1,3}(\\.\\d{1,3}){3}$")) return host; // already IPv4
+        if (host.contains(":") && !host.startsWith("[")) return host;  // IPv6
+        try {
+            return InetAddress.getByName(host).getHostAddress();
+        } catch (UnknownHostException e) {
+            return "-";
+        }
+    }
+
+    protected void setFilter(String filterString) {
+        if (filterString == null || filterString.isBlank()) {
+            this.logFilter = null;
+            return;
+        }
+        try {
+            this.logFilter = new LogTableFilter(filterString);
+        } catch (ParseException e) {
+            log.error("CyberEyes: invalid filter, proceeding without filter", e);
+            this.logFilter = null;
+        }
+    }
+
+    protected boolean passesFilter(LogEntry entry) {
+        return logFilter == null || logFilter.getFilterExpression().matches(entry);
+    }
+
+    protected String getRequestHeader(LogEntry entry, String name) {
+        List<HttpHeader> headers = entry.getRequestHeaders();
+        if (headers == null) return "";
+        return headers.stream()
+                .filter(h -> h.name().equalsIgnoreCase(name))
+                .map(HttpHeader::value)
+                .findFirst().orElse("");
+    }
+
+    protected String getResponseHeader(LogEntry entry, String name) {
+        List<HttpHeader> headers = entry.getResponseHeaders();
+        if (headers == null) return "";
+        return headers.stream()
+                .filter(h -> h.name().equalsIgnoreCase(name))
+                .map(HttpHeader::value)
+                .findFirst().orElse("");
+    }
+
+    private String str(Object value) {
+        return value != null ? value.toString() : "";
+    }
+}

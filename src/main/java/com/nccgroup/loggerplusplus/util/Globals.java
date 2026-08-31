@@ -73,6 +73,15 @@ public class Globals {
     public static final String PREF_GREP_HISTORY = "grepHistory";
     public static final String PREF_PREVIOUS_EXPORT_FIELDS = "previousExportFields";
     public static final String PREF_PREVIOUS_ELASTIC_FIELDS = "previousElasticFields";
+    public static final String PREF_CYBEREYES_ADDRESS = "cybereyesAddress";
+    public static final String PREF_CYBEREYES_PORT = "cybereyesPort";
+    public static final String PREF_CYBEREYES_PROTOCOL = "cybereyesProtocol";
+    public static final String PREF_CYBEREYES_SYSLOG_HOSTNAME = "cybereyesSyslogHostname";
+    public static final String PREF_CYBEREYES_FILTER = "cybereyesFilter";
+    public static final String PREF_CYBEREYES_FILTER_PROJECT_PREVIOUS = "cybereyesFilterProjectPrevious";
+    public static final String PREF_CYBEREYES_AUTOSTART_GLOBAL = "cybereyesAutostartGlobal";
+    public static final String PREF_CYBEREYES_AUTOSTART_PROJECT = "cybereyesAutostartProject";
+    public static final String PREF_CYBEREYES_BODY_LIMIT = "cybereyesBodyLimit";
     public static final String PREF_SAVED_FIELD_SELECTIONS = "savedFieldSelections";
     public static final String PREF_COLUMNS_VERSION = "columnsVersion";
     public static final String PREF_MAX_RESP_SIZE = "maxRespBodySize";
@@ -81,6 +90,8 @@ public class Globals {
     public enum ElasticAuthType {ApiKey, Basic, None}
 
     public enum Protocol {HTTP, HTTPS}
+
+    public enum CyberEyesProtocol { TCP, UDP }
     public static final String DEFAULT_COLOR_FILTERS_JSON = "{\"2add8ace-b652-416a-af08-4d78c5d22bc7\":{\"uid\":\"2add8ace-b652-416a-af08-4d78c5d22bc7\"," +
             "\"filter\":{\"filter\":\"Request.Complete == False\"},\"filterString\":\"Request.Complete == False\",\"backgroundColor\":{\"value\":-16777216,\"falpha\":0.0}," +
             "\"foregroundColor\":{\"value\":-65536,\"falpha\":0.0},\"enabled\":true,\"modified\":false,\"shouldRetest\":true,\"priority\":1}}";

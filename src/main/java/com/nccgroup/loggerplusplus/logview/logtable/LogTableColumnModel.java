@@ -38,6 +38,10 @@ public class LogTableColumnModel extends DefaultTableColumnModel {
         this.preferences = controller.getPreferences();
 
         ArrayList<LogTableColumn> columnList = preferences.getSetting(Globals.PREF_LOG_TABLE_SETTINGS);
+        if (columnList == null) {
+            preferences.resetSetting(Globals.PREF_LOG_TABLE_SETTINGS);
+            columnList = preferences.getSetting(Globals.PREF_LOG_TABLE_SETTINGS);
+        }
         // Sorting based on order number
         Collections.sort(columnList);
         this.allColumns = columnList;

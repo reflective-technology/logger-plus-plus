@@ -116,6 +116,18 @@ public class LoggerPreferenceFactory extends PreferenceFactory {
         prefs.registerSetting(PREF_ELASTIC_FILTER_PROJECT_PREVIOUS, String.class, null, Preferences.Visibility.PROJECT);
         prefs.registerSetting(PREF_ELASTIC_AUTOSTART_GLOBAL, Boolean.class, false);
         prefs.registerSetting(PREF_ELASTIC_AUTOSTART_PROJECT, Boolean.class, false, Preferences.Visibility.PROJECT);
+
+        // CyberEyes syslog exporter
+        prefs.registerSetting(PREF_CYBEREYES_ADDRESS, String.class, "127.0.0.1");
+        prefs.registerSetting(PREF_CYBEREYES_PORT, Integer.class, 514);
+        prefs.registerSetting(PREF_CYBEREYES_PROTOCOL, Globals.CyberEyesProtocol.class, Globals.CyberEyesProtocol.TCP);
+        prefs.registerSetting(PREF_CYBEREYES_SYSLOG_HOSTNAME, String.class, defaultSyslogHostname());
+        prefs.registerSetting(PREF_CYBEREYES_FILTER, String.class, "", Preferences.Visibility.GLOBAL);
+        prefs.registerSetting(PREF_CYBEREYES_FILTER_PROJECT_PREVIOUS, String.class, null, Preferences.Visibility.PROJECT);
+        prefs.registerSetting(PREF_CYBEREYES_AUTOSTART_GLOBAL, Boolean.class, false);
+        prefs.registerSetting(PREF_CYBEREYES_AUTOSTART_PROJECT, Boolean.class, false, Preferences.Visibility.PROJECT);
+        prefs.registerSetting(PREF_CYBEREYES_BODY_LIMIT, Integer.class, 1024);
+
         prefs.registerSetting(PREF_PREVIOUS_EXPORT_FIELDS, new TypeToken<List<LogEntryField>>() {
         }.getType(), new ArrayList<LogEntry>());
         prefs.registerSetting(PREF_PREVIOUS_ELASTIC_FIELDS, new TypeToken<List<LogEntryField>>() {
@@ -131,6 +143,14 @@ public class LoggerPreferenceFactory extends PreferenceFactory {
         if (prefs.getSetting(PREF_COLUMNS_VERSION) == null || (int) prefs.getSetting(PREF_COLUMNS_VERSION) != CURRENT_COLUMN_VERSION) {
             prefs.resetSetting(PREF_LOG_TABLE_SETTINGS);
             prefs.setSetting(PREF_COLUMNS_VERSION, CURRENT_COLUMN_VERSION);
+        }
+    }
+
+    private String defaultSyslogHostname() {
+        try {
+            return java.net.InetAddress.getLocalHost().getHostName();
+        } catch (java.net.UnknownHostException e) {
+            return "burp";
         }
     }
 
